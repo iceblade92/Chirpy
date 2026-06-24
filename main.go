@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"sync/atomic"
@@ -12,6 +13,32 @@ type apiConfig struct {
 
 func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
 	cfg.fileserverHits.Store(0)
+}
+
+func (cfg *apiConfig) handlerValidate(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Body string `json:"body"`
+	}
+	type returnVals struct {
+		Valid bool `json:"valid"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
+		return
+	}
+
+	if len(params.Body) > 140 {
+		respondWithError(w, http.StatusBadRequest, "Chirp is too long", nil)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, returnVals{
+		Valid: true,
+	})
 }
 
 func main() {
@@ -27,6 +54,7 @@ func main() {
 	})
 	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerMetrics)
 	mux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
+	mux.HandleFunc("POST /api/validate_chirp", apiCfg.handlerValidate)
 
 	server := &http.Server{
 		Addr:    ":8080",
