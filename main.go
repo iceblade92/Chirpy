@@ -25,8 +25,8 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
-	mux.HandleFunc("GET /api/metrics", apiCfg.handlerMetrics)
-	mux.HandleFunc("POST /api/reset", apiCfg.handlerReset)
+	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerMetrics)
+	mux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
 
 	server := &http.Server{
 		Addr:    ":8080",
