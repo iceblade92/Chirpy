@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"sync/atomic"
 )
 
@@ -20,7 +21,7 @@ func (cfg *apiConfig) handlerValidate(w http.ResponseWriter, r *http.Request) {
 		Body string `json:"body"`
 	}
 	type returnVals struct {
-		Valid bool `json:"valid"`
+		CleanedBody string `json:"cleaned_body"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -36,8 +37,17 @@ func (cfg *apiConfig) handlerValidate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	texts := strings.Split(params.Body, " ")
+	for i, word := range texts {
+		a_word := strings.ToLower(word)
+		if a_word == "kerfuffle" || a_word == "sharbert" || a_word == "fornax" {
+			texts[i] = "****"
+		}
+	}
+	cleanedText := strings.Join(texts, " ")
+
 	respondWithJSON(w, http.StatusOK, returnVals{
-		Valid: true,
+		CleanedBody: cleanedText,
 	})
 }
 
