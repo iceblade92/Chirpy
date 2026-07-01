@@ -6,17 +6,18 @@ import (
 	"time"
 
 	"github.com/iceblade92/Chirpy/internal/auth"
+	"github.com/iceblade92/Chirpy/internal/database"
 )
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Password         string `json:"password"`
-		Email            string `json:"email"`
-		ExpiresInSeconds *int   `json:"expires_in_seconds"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 	type response struct {
 		User
-		Token string `json:"token"`
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -25,14 +26,6 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
 		return
-	}
-
-	expiresIn := time.Hour
-	if params.ExpiresInSeconds != nil {
-		expiresIn = time.Duration(*params.ExpiresInSeconds) * time.Second
-		if expiresIn > time.Hour {
-			expiresIn = time.Hour
-		}
 	}
 
 	user, err := cfg.db.GetUserByEmail(r.Context(), params.Email)
@@ -47,9 +40,20 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.MakeJWT(user.ID, cfg.jwtSecret, expiresIn)
+	token, err := auth.MakeJWT(user.ID, cfg.jwtSecret, time.Hour)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create token", err)
+		return
+	}
+
+	rtoken := auth.MakeRefreshToken()
+	_, err = cfg.db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+		Token:     rtoken,
+		ExpiresAt: time.Now().Add(time.Hour * 24 * 60),
+		UserID:    user.ID,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create token in data base", err)
 		return
 	}
 
@@ -59,6 +63,8 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 			Email:     user.Email,
 			CreatedAt: user.CreatedAt,
 			UpdatedAt: user.UpdatedAt,
-		}, Token: token,
+		},
+		Token:        token,
+		RefreshToken: rtoken,
 	})
 }
